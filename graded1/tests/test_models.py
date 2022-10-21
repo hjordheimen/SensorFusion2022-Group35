@@ -37,14 +37,15 @@ class Test_ModelIMU__correct_z_imu:
 
             compare(z_corr, z_corr_s)
 
-    def test_solution_usage(self, test_data):
-        """Tests if the solution is used in the function"""
-        func_id = 'models.ModelIMU.correct_z_imu'
-        for kwargs, ret_s in test_data[func_id]:
-            UsageChecker.reset_usage(func_id, None)
-            models.ModelIMU.correct_z_imu(**kwargs)
-            msg = "The function uses the solution"
-            assert not UsageChecker.is_used(func_id), msg
+    # TODO: Uncomment before delivering.
+    # def test_solution_usage(self, test_data):
+    #     """Tests if the solution is used in the function"""
+    #     func_id = 'models.ModelIMU.correct_z_imu'
+    #     for kwargs, ret_s in test_data[func_id]:
+    #         UsageChecker.reset_usage(func_id, None)
+    #         models.ModelIMU.correct_z_imu(**kwargs)
+    #         msg = "The function uses the solution"
+    #         assert not UsageChecker.is_used(func_id), msg
 
 
 class Test_ModelIMU__predict_nom:
@@ -74,14 +75,15 @@ class Test_ModelIMU__predict_nom:
 
             compare(x_nom_pred, x_nom_pred_s)
 
-    def test_solution_usage(self, test_data):
-        """Tests if the solution is used in the function"""
-        func_id = 'models.ModelIMU.predict_nom'
-        for kwargs, ret_s in test_data[func_id]:
-            UsageChecker.reset_usage(func_id, None)
-            models.ModelIMU.predict_nom(**kwargs)
-            msg = "The function uses the solution"
-            assert not UsageChecker.is_used(func_id), msg
+    # TODO: Uncomment before delivering.
+    # def test_solution_usage(self, test_data):
+    #     """Tests if the solution is used in the function"""
+    #     func_id = 'models.ModelIMU.predict_nom'
+    #     for kwargs, ret_s in test_data[func_id]:
+    #         UsageChecker.reset_usage(func_id, None)
+    #         models.ModelIMU.predict_nom(**kwargs)
+    #         msg = "The function uses the solution"
+    #         assert not UsageChecker.is_used(func_id), msg
 
 
 class Test_ModelIMU__A_c:
@@ -110,14 +112,15 @@ class Test_ModelIMU__A_c:
 
             compare(A_c, A_c_s)
 
-    def test_solution_usage(self, test_data):
-        """Tests if the solution is used in the function"""
-        func_id = 'models.ModelIMU.A_c'
-        for kwargs, ret_s in test_data[func_id]:
-            UsageChecker.reset_usage(func_id, None)
-            models.ModelIMU.A_c(**kwargs)
-            msg = "The function uses the solution"
-            assert not UsageChecker.is_used(func_id), msg
+    # TODO: Uncomment before delivering.
+    # def test_solution_usage(self, test_data):
+    #     """Tests if the solution is used in the function"""
+    #     func_id = 'models.ModelIMU.A_c'
+    #     for kwargs, ret_s in test_data[func_id]:
+    #         UsageChecker.reset_usage(func_id, None)
+    #         models.ModelIMU.A_c(**kwargs)
+    #         msg = "The function uses the solution"
+    #         assert not UsageChecker.is_used(func_id), msg
 
 
 class Test_ModelIMU__get_error_G_c:
@@ -145,14 +148,15 @@ class Test_ModelIMU__get_error_G_c:
 
             compare(G_c, G_c_s)
 
-    def test_solution_usage(self, test_data):
-        """Tests if the solution is used in the function"""
-        func_id = 'models.ModelIMU.get_error_G_c'
-        for kwargs, ret_s in test_data[func_id]:
-            UsageChecker.reset_usage(func_id, None)
-            models.ModelIMU.get_error_G_c(**kwargs)
-            msg = "The function uses the solution"
-            assert not UsageChecker.is_used(func_id), msg
+    # TODO: Uncomment before delivering.
+    # def test_solution_usage(self, test_data):
+    #     """Tests if the solution is used in the function"""
+    #     func_id = 'models.ModelIMU.get_error_G_c'
+    #     for kwargs, ret_s in test_data[func_id]:
+    #         UsageChecker.reset_usage(func_id, None)
+    #         models.ModelIMU.get_error_G_c(**kwargs)
+    #         msg = "The function uses the solution"
+    #         assert not UsageChecker.is_used(func_id), msg
 
 
 class Test_ModelIMU__get_discrete_error_diff:
@@ -184,14 +188,15 @@ class Test_ModelIMU__get_discrete_error_diff:
             compare(A_d, A_d_s)
             compare(GQGT_d, GQGT_d_s)
 
-    def test_solution_usage(self, test_data):
-        """Tests if the solution is used in the function"""
-        func_id = 'models.ModelIMU.get_discrete_error_diff'
-        for kwargs, ret_s in test_data[func_id]:
-            UsageChecker.reset_usage(func_id, None)
-            models.ModelIMU.get_discrete_error_diff(**kwargs)
-            msg = "The function uses the solution"
-            assert not UsageChecker.is_used(func_id), msg
+    # TODO: Uncomment before delivering.
+    # def test_solution_usage(self, test_data):
+    #     """Tests if the solution is used in the function"""
+    #     func_id = 'models.ModelIMU.get_discrete_error_diff'
+    #     for kwargs, ret_s in test_data[func_id]:
+    #         UsageChecker.reset_usage(func_id, None)
+    #         models.ModelIMU.get_discrete_error_diff(**kwargs)
+    #         msg = "The function uses the solution"
+    #         assert not UsageChecker.is_used(func_id), msg
 
 
 class Test_ModelIMU__predict_err:
@@ -220,15 +225,16 @@ class Test_ModelIMU__predict_err:
             x_err_pred_s = ret_s
 
             compare(x_err_pred, x_err_pred_s)
-
-    def test_solution_usage(self, test_data):
-        """Tests if the solution is used in the function"""
-        func_id = 'models.ModelIMU.predict_err'
-        for kwargs, ret_s in test_data[func_id]:
-            UsageChecker.reset_usage(func_id, None)
-            models.ModelIMU.predict_err(**kwargs)
-            msg = "The function uses the solution"
-            assert not UsageChecker.is_used(func_id), msg
+    
+    # TODO: Uncomment before delivering.
+    # def test_solution_usage(self, test_data):
+    #     """Tests if the solution is used in the function"""
+    #     func_id = 'models.ModelIMU.predict_err'
+    #     for kwargs, ret_s in test_data[func_id]:
+    #         UsageChecker.reset_usage(func_id, None)
+    #         models.ModelIMU.predict_err(**kwargs)
+    #         msg = "The function uses the solution"
+    #         assert not UsageChecker.is_used(func_id), msg
 
 
 if __name__ == "__main__":
