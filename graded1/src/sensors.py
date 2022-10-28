@@ -5,6 +5,7 @@ import numpy as np
 from senfuslib import MultiVarGauss
 from states import NominalState, GnssMeasurement, EskfState
 from utils.cross_matrix import get_cross_matrix
+from utils.indexing import block_3x3
 from solution import sensors as sensors_solu
 
 
@@ -32,6 +33,16 @@ class SensorGNSS:
         """
 
         # TODO remove this
+        Rot=x_nom.ori.as_rotmat()
+        arm = self.lever_arm
+       # H=np.zeros(3,15)
+       # H[block_3x3(0,0)] = np.eye(3)
+       # H[block_3x3(2,0)]
+
+        #H_1=np.eye(3)
+        #H=np.hstack([H_1,np.zeros((3,12))])
+
+
         H = sensors_solu.SensorGNSS.H(self, x_nom)
         return H
 
