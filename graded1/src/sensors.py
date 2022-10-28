@@ -31,8 +31,21 @@ class SensorGNSS:
             H (ndarray[3, 15]): the measurement matrix
         """
 
-        # TODO remove this
+        get_cross_matrix(x_nom)
+         
+        H   = np.hstack([np.eye(3), np.zeros([3, 13])])
+        print("---HENRIk---")
+        print(self.R)
+
+        # h   = x_nom.pos + self.lever_arm @ x_nom.ori
+        
+
+
+
+        # # TODO remove this
         H = sensors_solu.SensorGNSS.H(self, x_nom)
+        print("---SOLUTION---")
+        print(H.T)
         return H
 
     def pred_from_est(self, x_est: EskfState,
