@@ -12,6 +12,7 @@ from states import NominalState, ErrorState
 
 from quaternion import RotationQuaterion
 from utils.cross_matrix import get_cross_matrix
+from utils.indexing import block_3x3
 from sensors import SensorGNSS
 from models import ModelIMU
 from solution import eskf as eskf_solu
@@ -114,20 +115,22 @@ class ESKF():
             x_est_inj: eskf state after injection
         """
 
-        #pos_inj = x_est_nom.pos + x_est_err.mean[0:3]
-        #vel_inj = x_est_nom.vel + x_est_err.mean[3:6]
-        #ori_inj = RotationQuaterion(x_est_nom.ori.multiply(x_est_err.mean[6:10]))
-        #accm_bias_inj = x_est_nom.accm_bias + x_est_err.mean[10:13]
-        #gyro_bias_inj = x_est_nom.gyro_bias + x_est_err.mean[13:16]
+        pos_inj = x_est_nom.pos + x_est_err.mean[0:3]
+        vel_inj = x_est_nom.vel + x_est_err.mean[3:6]
+        delta_q = RotationQuaterion(1,x_est_err.mean[6:9]/2)
+        ori_inj = x_est_nom.ori.multiply(delta_q)
+        accm_bias_inj = x_est_nom.accm_bias + x_est_err.mean[9:12]
+        gyro_bias_inj = x_est_nom.gyro_bias + x_est_err.mean[12:15]
 
-        #x_nom_inj = NominalState(pos_inj, vel_inj, ori_inj,accm_bias_inj, gyro_bias_inj)
-
-        #P_inj = np.eye(15)
-        #x_err_inj = MultiVarGauss[ErrorState](np.zeros(15), P_inj)
-        #x_est_inj = EskfState(x_nom_inj, x_err_inj)
+        x_nom_inj = NominalState(pos_inj, vel_inj, ori_inj,accm_bias_inj, gyro_bias_inj)
+        G = np.eye(15)
+        G[block_3x3(2,2)] = np.eye(3) - get_cross_matrix(x_est_err.mean[6:9]/2)
+        P_inj = G @ x_est_err.cov @ G.T
+        x_err_inj = MultiVarGauss[ErrorState](np.zeros(15), P_inj)
+        x_est_inj = EskfState(x_nom_inj, x_err_inj)
 
         # TODO remove this
-        x_est_inj = eskf_solu.ESKF.inject(self, x_est_nom, x_est_err)
+        #x_est_inj = eskf_solu.ESKF.inject(self, x_est_nom, x_est_err)
         return x_est_inj
 
     def update_from_gnss(self,
