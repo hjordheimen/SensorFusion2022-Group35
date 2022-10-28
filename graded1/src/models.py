@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from tkinter import N
 from typing import Tuple
 import numpy as np
 import scipy.linalg
@@ -18,20 +19,20 @@ class ModelIMU:
     This works as an IMU measures the change between two states, 
     and not the state itself.."""
 
-    accm_std: float
-    accm_bias_std: float
-    accm_bias_p: float
+    accm_std        : float     
+    accm_bias_std   : float     #Bias noise in accelerometer, a_w
+    accm_bias_p     : float     #Noise on accelerometer, a_n???
 
-    gyro_std: float
-    gyro_bias_std: float
-    gyro_bias_p: float
+    gyro_std        : float
+    gyro_bias_std   : float     #Bias noise in gyro, w_w
+    gyro_bias_p     : float     #Noise on gyro, w_n???
 
-    accm_correction: 'np.ndarray[3, 3]'
-    gyro_correction: 'np.ndarray[3, 3]'
+    accm_correction : 'np.ndarray[3, 3]'
+    gyro_correction : 'np.ndarray[3, 3]'
 
-    g: 'np.ndarray[3]' = field(default=np.array([0, 0, 9.82]))
+    g: 'np.ndarray[3]'          = field(default=np.array([0, 0, 9.82]))
 
-    Q_c: 'np.ndarray[12, 12]' = field(init=False, repr=False)
+    Q_c: 'np.ndarray[12, 12]'   = field(init=False, repr=False)
 
     def __post_init__(self):
         def diag3(x): return np.diag([x]*3)
@@ -63,11 +64,15 @@ class ModelIMU:
         Returns:
             z_corr: corrected IMU measurement
         """
-        acc_est = np.zeros(3)
-        avel_est = np.zeros(3)
+        a_b, w_b    = x_est_nom.accm_bias, x_est_nom.gyro_bias
+        a_m, w_m    = z_imu.acc, z_imu.avel
 
-        # TODO remove this
-        z_corr = models_solu.ModelIMU.correct_z_imu(self, x_est_nom, z_imu)
+        # Check here if failure later...
+        acc_est     = self.accm_correction @ (a_m - a_b)
+        avel_est    = self.gyro_correction @ (w_m - w_b)
+
+        z_corr      = CorrectedImuMeasurement(acc_est, avel_est)
+        
         return z_corr
 
     def predict_nom(self,
@@ -89,18 +94,28 @@ class ModelIMU:
         Returns:
             x_nom_pred: predicted nominal state
         """
-        pos_pred = np.zeros(3)  # TODO
-        vel_pred = np.zeros(3)  # TODO
+        pos, vel, ori   = x_est_nom.pos, x_est_nom.vel, x_est_nom.ori
+        acc_b, gyro_b   = x_est_nom.accm_bias, x_est_nom.gyro_bias
 
-        delta_rot = RotationQuaterion(1, np.zeros(3))  # TODO
-        ori_pred = np.zeros(3)  # TODO
+        a, w            = RotationQuaterion.as_rotmat(ori) @ z_corr.acc + self.g, z_corr.avel
 
-        acc_bias_pred = np.zeros(3)  # TODO
-        gyro_bias_pred = np.zeros(3)  # TODO
+        # print("_______________________________")
+        # print(self.accm_bias_p, self.accm_bias_std)
+        # print("_______________________________")
+        
+        
 
-        # TODO remove this
-        x_nom_pred = models_solu.ModelIMU.predict_nom(
-            self, x_est_nom, z_corr, dt)
+        pos_pred        = pos + dt * vel + dt**2 * a / 2  # TODO
+        vel_pred        = vel + dt * a  # TODO
+
+        delta_rot       = RotationQuaterion.from_avec(dt*w)  # TODO
+        ori_pred        = RotationQuaterion.multiply(ori, delta_rot)  # TODO
+
+        acc_bias_pred   = acc_b - self.accm_bias_p * np.eye(3) @ acc_b *dt # TODO
+        gyro_bias_pred  = gyro_b - self.gyro_bias_p * np.eye(3) @ gyro_b * dt  # TODO
+
+        x_nom_pred      = NominalState(pos_pred, vel_pred, ori_pred, acc_bias_pred, gyro_bias_pred)
+        
         return x_nom_pred
 
     def A_c(self,
@@ -128,13 +143,22 @@ class ModelIMU:
         S_acc = get_cross_matrix(z_corr.acc)
         S_omega = get_cross_matrix(z_corr.avel)
 
+        A_c[block_3x3(0, 1)]    = np.eye(3)
+        A_c[block_3x3(1, 2)]    = -Rq @ S_acc
+        A_c[block_3x3(1, 3)]    = -Rq @ self.accm_correction
+        A_c[block_3x3(2, 2)]    = -S_omega
+        A_c[block_3x3(2, 4)]    = -self.gyro_correction
+        A_c[block_3x3(3, 3)]    = -self.accm_bias_p * np.eye(3)
+        A_c[block_3x3(4, 4)]    = -self.gyro_bias_p * np.eye(3)
+
         # TODO remove this
-        A_c = models_solu.ModelIMU.A_c(self, x_est_nom, z_corr)
+        # A_c = models_solu.ModelIMU.A_c(self, x_est_nom, z_corr)
+
         return A_c
 
     def get_error_G_c(self,
                       x_est_nom: NominalState,
-                      ) -> 'np.ndarray[15, 15]':
+                      ) -> 'np.ndarray[15, 15]': # Should be [15, 12]
         """The continous noise covariance matrix, G, in (10.68)
 
         Hint: you can use block_3x3 to simplify indexing if you want to.
@@ -143,13 +167,15 @@ class ModelIMU:
         Args:
             x_est_nom: previous nominal state
         Returns:
-            G_c (ndarray[15, 15]): G in (10.68)
+            G_c (ndarray[15, 15]): G in (10.68) # Should be [15, 12]
         """
-        G_c = np.zeros((15, 12))
-        Rq = x_est_nom.ori.as_rotmat()
+        G_c                     = np.zeros((15, 12))
+        Rq                      = x_est_nom.ori.as_rotmat()
 
-        # TODO remove this
-        G_c = models_solu.ModelIMU.get_error_G_c(self, x_est_nom)
+        G_c[block_3x3(1, 0)]    = -Rq
+        G_c[block_3x3(2, 1)]    = -np.eye(3)
+        G_c[block_3x3(3, 2)]    = np.eye(3)
+        G_c[block_3x3(4, 3)]    = np.eye(3)
 
         return G_c
 
@@ -175,19 +201,16 @@ class ModelIMU:
             A_d (ndarray[15, 15]): discrede transition matrix
             GQGT_d (ndarray[15, 15]): discrete noise covariance matrix
         """
-        A_c = None  # TODO
-        G_c = None  # TODO
-        GQGT_c = None  # TODO
+        A_c             = self.A_c(x_est_nom, z_corr)  # TODO
+        G_c             = self.get_error_G_c(x_est_nom)  # TODO
+        GQGT_c          = G_c @ self.Q_c @ G_c.T  # TODO
 
-        exponent = None  # TODO
-        VanLoanMatrix = None  # TODO
+        exponent        = np.vstack([np.hstack([-A_c, GQGT_c]), \
+                                        np.hstack([np.zeros([15, 15]), A_c.T])]) # TODO
+        VanLoanMatrix   = scipy.linalg.expm(exponent * dt)  # TODO
 
-        A_d = None  # TODO
-        GQGT_d = None  # TODO
-
-        # TODO remove this
-        A_d, GQGT_d = models_solu.ModelIMU.get_discrete_error_diff(
-            self, x_est_nom, z_corr, dt)
+        A_d             = VanLoanMatrix[15:30, 15:30].T  # TODO
+        GQGT_d          = VanLoanMatrix[0:15, 15:30]  # TODO
 
         return A_d, GQGT_d
 
@@ -208,12 +231,17 @@ class ModelIMU:
         Returns:
             x_err_pred: predicted error state gaussian
         """
-        x_est_prev_nom = x_est_prev.nom
-        x_est_prev_err = x_est_prev.err
-        Ad, GQGTd = None, None  # TODO
-        P_pred = np.eye(15)  # TODO
+        x_est_prev_nom  = x_est_prev.nom     #NominalState
+        x_est_prev_err  = x_est_prev.err     #MultivarGauss
+        
+        Ad, GQGTd       = self.get_discrete_error_diff(x_est_prev_nom, z_corr, dt)  # TODO     
 
-        # TODO remove this
-        x_err_pred = models_solu.ModelIMU.predict_err(
-            self, x_est_prev, z_corr, dt)
+        Qd              = Ad @ GQGTd
+
+        x_err           = Ad @ x_est_prev_err.mean
+
+        P_pred          = Ad @ x_est_prev_err.cov @ Ad.T + Qd
+
+        x_err_pred      = MultiVarGauss(x_err, P_pred)
+        
         return x_err_pred
