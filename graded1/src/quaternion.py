@@ -40,21 +40,23 @@ class RotationQuaterion(NamedArray):
         Returns:
             quaternion_product: the product
         """
-        eta_a, epsilon_a = self
-        eta_b, epsilon_b = other
-        eta_out = 1  # TODO
-        epout = np.zeros(3)  # TODO
+        
+        eta_a, epsilon_a    = self
+        eta_b, epsilon_b    = other
 
-        # TODO remove this
-        quaternion_product = quaternion_solu.RotationQuaterion.multiply(
-            self, other)
+        eta_out             = eta_a * eta_b - epsilon_a.T @ epsilon_b  
+        epout               = eta_b * epsilon_a + eta_a * epsilon_b + np.cross(epsilon_a, epsilon_b)
+
+        quaternion_product  = RotationQuaterion(eta_out, epout)
+
         return quaternion_product
 
     def conjugate(self) -> 'RotationQuaterion':
         """Get the conjugate of the RotationQuaternion"""
 
-        # TODO remove this
-        conj = quaternion_solu.RotationQuaterion.conjugate(self)
+        eta, epsilon        = self
+        conj                = RotationQuaterion(eta, -epsilon)
+
         return conj
 
     def diff(self, other: 'RotationQuaterion') -> 'RotationQuaterion':
