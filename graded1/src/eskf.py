@@ -40,15 +40,13 @@ class ESKF():
         if dt == 0:
             return x_est_prev
 
-        x_est_prev_nom = x_est_prev.nom
-        z_corr = self.model.correct_z_imu(x_est_prev_nom,z_imu)  # TODO
-        x_est_pred_nom = self.model.predict_nom(x_est_prev_nom,z_corr,dt)  # TODO
-        x_est_pred_err = self.model.predict_err(x_est_prev,z_corr,dt)  # TODO
+        x_est_prev_nom  = x_est_prev.nom
+        z_corr          = self.model.correct_z_imu(x_est_prev_nom,z_imu)
+        x_est_pred_nom  = self.model.predict_nom(x_est_prev_nom,z_corr,dt)  
+        x_est_pred_err  = self.model.predict_err(x_est_prev,z_corr,dt)  
 
-        x_est_pred = EskfState(x_est_pred_nom, x_est_pred_err)
-
-        # TODO remove this
-        #x_est_pred = eskf_solu.ESKF.predict_from_imu(self, x_est_prev, z_imu, dt)
+        x_est_pred      = EskfState(x_est_pred_nom, x_est_pred_err)
+        
         return x_est_pred
 
     def update_err_from_gnss(self,
@@ -76,26 +74,24 @@ class ESKF():
         Returns:
             x_est_upd_err: updated error state gaussian
         """
-        x_nom = x_est_pred.nom
-        x_err = x_est_pred.err
-        z_pred, S = z_est_pred
+        x_nom           = x_est_pred.nom
+        x_err           = x_est_pred.err
+        z_pred, S       = z_est_pred
 
-        innovation = z_gnss - z_pred  # TODO
-        H = self.sensor.H(x_nom)  # TODO
-        P = x_err.cov  # TODO
-        R = self.sensor.R  # TODO
-        S_inv = np.linalg.inv(S) 
-        #S_inv = np.linalg.solve(S, H.T)
-        W = P @ H.T @ S_inv  # TODO
-        x_err_upd = W @ innovation  # TODO
-        I_WH = np.eye(*P.shape) - W @ H  # TODO
-        x_err_cov_upd = (I_WH @ P @ I_WH.T + W @ R @ W.T)  # TODO
+        innovation      = z_gnss - z_pred  
+        H               = self.sensor.H(x_nom)  
+        P               = x_err.cov  
+        R               = self.sensor.R  
+        S_inv           = np.linalg.inv(S) 
+        
+        W               = P @ H.T @ S_inv 
+        x_err_upd       = W @ innovation 
+        I_WH            = np.eye(*P.shape) - W @ H 
+        x_err_cov_upd   = (I_WH @ P @ I_WH.T + W @ R @ W.T) 
 
-        x_err_upd = ErrorState.from_array(x_err_upd)
-        x_est_upd_err = MultiVarGauss[ErrorState](x_err_upd, x_err_cov_upd)
+        x_err_upd       = ErrorState.from_array(x_err_upd)
+        x_est_upd_err   = MultiVarGauss[ErrorState](x_err_upd, x_err_cov_upd)
 
-        # TODO remove this
-        #x_est_upd_err = eskf_solu.ESKF.update_err_from_gnss(self, x_est_pred, z_est_pred, z_gnss)
         return x_est_upd_err
 
     def inject(self,
@@ -115,22 +111,22 @@ class ESKF():
             x_est_inj: eskf state after injection
         """
 
-        pos_inj = x_est_nom.pos + x_est_err.mean[0:3]
-        vel_inj = x_est_nom.vel + x_est_err.mean[3:6]
-        delta_q = RotationQuaterion(1,x_est_err.mean[6:9]/2)
-        ori_inj = x_est_nom.ori.multiply(delta_q)
-        accm_bias_inj = x_est_nom.accm_bias + x_est_err.mean[9:12]
-        gyro_bias_inj = x_est_nom.gyro_bias + x_est_err.mean[12:15]
+        pos_inj             = x_est_nom.pos + x_est_err.mean[0:3]
+        vel_inj             = x_est_nom.vel + x_est_err.mean[3:6]
+        delta_q             = RotationQuaterion(1,x_est_err.mean[6:9]/2)
+        ori_inj             = x_est_nom.ori.multiply(delta_q)
+        accm_bias_inj       = x_est_nom.accm_bias + x_est_err.mean[9:12]
+        gyro_bias_inj       = x_est_nom.gyro_bias + x_est_err.mean[12:15]
 
-        x_nom_inj = NominalState(pos_inj, vel_inj, ori_inj,accm_bias_inj, gyro_bias_inj)
-        G = np.eye(15)
-        G[block_3x3(2,2)] = np.eye(3) - get_cross_matrix(x_est_err.mean[6:9]/2)
-        P_inj = G @ x_est_err.cov @ G.T
-        x_err_inj = MultiVarGauss[ErrorState](np.zeros(15), P_inj)
-        x_est_inj = EskfState(x_nom_inj, x_err_inj)
+        x_nom_inj           = NominalState(pos_inj, vel_inj, ori_inj,accm_bias_inj, gyro_bias_inj)
 
-        # TODO remove this
-        #x_est_inj = eskf_solu.ESKF.inject(self, x_est_nom, x_est_err)
+        G                   = np.eye(15)
+        G[block_3x3(2,2)]   = np.eye(3) - get_cross_matrix(x_est_err.mean[6:9]/2)
+        P_inj               = G @ x_est_err.cov @ G.T
+        x_err_inj           = MultiVarGauss[ErrorState](np.zeros(15), P_inj)
+
+        x_est_inj           = EskfState(x_nom_inj, x_err_inj)
+
         return x_est_inj
 
     def update_from_gnss(self,
@@ -151,11 +147,8 @@ class ESKF():
             z_est_upd: predicted measurement gaussian
 
         """
-        z_est_pred = self.sensor.pred_from_est(x_est_pred)  # TODO
-        x_est_upd_err = self.update_err_from_gnss(x_est_pred,z_est_pred,z_gnss)  # TODO
-        x_est_upd = self.inject(x_est_pred.nom,x_est_upd_err)  # TODO
-
-        # TODO remove this
-        #x_est_upd, z_est_pred = eskf_solu.ESKF.update_from_gnss(self, x_est_pred, z_gnss)
+        z_est_pred      = self.sensor.pred_from_est(x_est_pred)  
+        x_est_upd_err   = self.update_err_from_gnss(x_est_pred,z_est_pred,z_gnss)  
+        x_est_upd       = self.inject(x_est_pred.nom,x_est_upd_err)  
 
         return x_est_upd, z_est_pred
