@@ -90,36 +90,40 @@ def main():
     ##
     z = [zk.T for zk in simSLAM_ws["z"].ravel()]
 
-    landmarks = simSLAM_ws["landmarks"].T
-    odometry = simSLAM_ws["odometry"].T
-    poseGT = simSLAM_ws["poseGT"].T
+    landmarks   = simSLAM_ws["landmarks"].T
+    odometry    = simSLAM_ws["odometry"].T
+    poseGT      = simSLAM_ws["poseGT"].T
 
-    K = len(z)
-    M = len(landmarks)
+    K           = len(z)
+    M           = len(landmarks)
+
+    # landmarks   = landmarks[:M//4, :]
 
     # %% Initilize
-    Q = np.diag([0.1, 0.1, 1 * np.pi / 180]) ** 2 # TODO tune
-    R = np.diag([0.1, 1 * np.pi / 180]) ** 2 # TODO tune
+    Q = (1/1)*np.diag([0.1, 0.1, 1 * np.pi / 180]) ** 2 # TODO tune
+    R = (1/1)*np.diag([0.1, 1 * np.pi / 180]) ** 2 # TODO tune
 
     doAsso = True
 
     JCBBalphas = np.array(
-        [0.001, 0.0001] # TODO tune
+        [0.001, 0.01] # TODO tune
     )  # first is for joint compatibility, second is individual
 
     slam = EKFSLAM(Q, R, do_asso=doAsso, alphas=JCBBalphas)
 
     # allocate
-    eta_pred: List[Optional[np.ndarray]] = [None] * K
-    P_pred: List[Optional[np.ndarray]] = [None] * K
-    eta_hat: List[Optional[np.ndarray]] = [None] * K
-    P_hat: List[Optional[np.ndarray]] = [None] * K
-    a: List[Optional[np.ndarray]] = [None] * K
-    NIS = np.zeros(K)
-    NISnorm = np.zeros(K)
-    CI = np.zeros((K, 2))
-    CInorm = np.zeros((K, 2))
-    NEESes = np.zeros((K, 3))
+    eta_pred: List[Optional[np.ndarray]]    = [None] * K
+    P_pred: List[Optional[np.ndarray]]      = [None] * K
+    eta_hat: List[Optional[np.ndarray]]     = [None] * K
+    P_hat: List[Optional[np.ndarray]]       = [None] * K
+    a: List[Optional[np.ndarray]]           = [None] * K
+    NIS                                     = np.zeros(K)
+    NISnorm                                 = np.zeros(K)
+    CI                                      = np.zeros((K, 2))
+    CInorm                                  = np.zeros((K, 2))
+    NEESes                                  = np.zeros((K, 3))
+
+    pos_hat_all                             = np.zeros((K, 2))
 
     # For consistency testing
     alpha = 0.05
@@ -132,8 +136,8 @@ def main():
     # %% Set up plotting
     # plotting
 
-    doAssoPlot = False
-    playMovie = True
+    doAssoPlot  = False
+    playMovie   = False
     if doAssoPlot:
         figAsso, axAsso = plt.subplots(num=1, clear=True)
 
@@ -158,6 +162,8 @@ def main():
         assert (
             eta_hat[k].shape[0] == P_hat[k].shape[0]
         ), "dimensions of mean and covariance do not match"
+
+        pos_hat_all[k, :]   = eta_hat[k][:2] 
 
         num_asso = np.count_nonzero(a[k] > -1)
 
@@ -222,9 +228,20 @@ def main():
     ax2.plot(*poseGT.T[:2], c="r", label="gt")
     ax2.plot(*pose_est.T[:2], c="g", label="est")
     ax2.plot(*ellipse(pose_est[-1, :2], P_hat[N - 1][:2, :2], 5, 200).T, c="g")
-    ax2.set(title="results", xlim=(mins[0], maxs[0]), ylim=(mins[1], maxs[1]))
+    ax2.set(xlim=(mins[0], maxs[0]), ylim=(mins[1], maxs[1]))
+    ax2.set_title("Results", size=50, weight='bold')
     ax2.axis("equal")
     ax2.grid()
+
+    fig6, ax6   = plt.subplots(nrows=2, ncols=1,figsize=(7, 5), num=6, clear=True, sharex=True)
+    tags        = ["x", "y"]
+    inds        = [0, 1]
+    for ax, tag, ind in zip(ax6, tags, inds):    
+        ax.plot(poseGT[:-1, ind] - pos_hat_all[:, ind])
+        ax.legend(f"{tag}")
+        ax.set_ylabel("Meters [m]")
+        ax.set_title(f"{tag} estimate error", size=50, weight='bold')
+        
 
     # %% Consistency
 
@@ -236,7 +253,10 @@ def main():
     ax3.plot(CInorm[:N, 1], "--")
     ax3.plot(NISnorm[:N], lw=0.5)
 
-    ax3.set_title(f"NIS, {insideCI.mean()*100}% inside CI")
+    ax3.set_title(f"NIS, {insideCI.mean()*100}% inside CI", size=50, weight='bold')
+    print("\nNumber of times NIS falls within CI:\t\t", np.count_nonzero(insideCI), "/", N)
+    print("ANIS:\t", NIS.mean())
+
 
     # NEES
 
@@ -252,12 +272,13 @@ def main():
         ax.plot(np.full(N, CI_NEES[1]), "--")
         ax.plot(NEES[:N], lw=0.5)
         insideCI = (CI_NEES[0] <= NEES) * (NEES <= CI_NEES[1])
-        ax.set_title(f"NEES {tag}: {insideCI.mean()*100}% inside CI")
+        ax.set_title(f"NEES {tag}: {insideCI.mean()*100}% inside CI", size=50, weight='bold')
+        print(f"\nNumber of times NEES {tag} falls within CI:\t", np.count_nonzero(insideCI), "/", N)
 
         CI_ANEES = np.array(chi2.interval(confidence_prob, df * N)) / N
         print(f"CI ANEES {tag}: {CI_ANEES}")
         print(f"ANEES {tag}: {NEES.mean()}")
-
+    
     fig4.tight_layout()
 
     # %% RMSE
@@ -277,12 +298,12 @@ def main():
     for ax, err, tag, ylabel, scaling in zip(ax5, errs, tags[1:], ylabels, scalings):
         ax.plot(err * scaling)
         ax.set_title(
-            f"{tag}: RMSE {np.sqrt((err**2).mean())*scaling} {ylabel}")
+            f"{tag}: RMSE {np.sqrt((err**2).mean())*scaling} {ylabel}", size=50, weight='bold')
         ax.set_ylabel(f"[{ylabel}]")
         ax.grid()
 
     fig5.tight_layout()
-
+    print("\n\n")
     # %% Movie time
 
     if playMovie:
@@ -291,10 +312,10 @@ def main():
 
             from celluloid import Camera
 
-            pauseTime = 0.05
+            pauseTime           = 0.05
             fig_movie, ax_movie = plt.subplots(num=6, clear=True)
 
-            camera = Camera(fig_movie)
+            camera              = Camera(fig_movie)
 
             ax_movie.grid()
             ax_movie.set(xlim=(mins[0], maxs[0]), ylim=(mins[1], maxs[1]))
