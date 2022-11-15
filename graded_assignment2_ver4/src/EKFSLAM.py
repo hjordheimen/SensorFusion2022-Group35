@@ -243,7 +243,7 @@ class EKFSLAM:
         """
         H_sol = solution.EKFSLAM.EKFSLAM.h_jac(self, eta)
         # print(H[:, 5:7])
-        return H_sol
+        # return H_sol
 
         # extract states and map
         x = eta[0:3]
@@ -292,22 +292,38 @@ class EKFSLAM:
             
             zc_i        = zc[:, i].reshape([2,1])
             zc_norm     = zr[i]
+            delta_m_i       = delta_m[:, i].reshape([2,1])
+            delta_m_norm     = la.norm(delta_m_i)
 
             # TODO: Set H or Hx and Hm here
-            jac_z_cb    = np.hstack([-np.eye(2), -Rpihalf @ zc_i])
+            jac_z_cb    = np.hstack([-np.eye(2), -Rpihalf @ delta_m_i])
             
             Dzr         = (zc_i.T/zc_norm) @ jac_z_cb
             Dztheta     = (zc_i.T @ Rpihalf.T/(zc_norm**2)) @ jac_z_cb
 
             Hx[inds]    = np.vstack([Dzr, Dztheta])
+
+            Hm_1        = zc_i.T / (zc_norm)
+            Hm_2        = zc_i.T @ Rpihalf.T / (zc_norm**2)   # Har lagt til en minus for å få differensen med solution tol å gå opp... Strider med boka.
             
-            Hm_1        = zc_norm * zc_i.T / (zc_norm**2)
-            Hm_2        = zc_i.T @ Rpihalf / (zc_norm**2)
             Hm[inds, inds]  = np.vstack([Hm_1, Hm_2])
-            
+        
+        np.set_printoptions(suppress=False)
         H   = np.hstack([Hx, Hm]) 
-        assert np.allclose(H[:, :3], H_sol[:, :3], atol=1e-6)   # Well it works here...
-        # print(H[:, :3] - H_sol[:, :3] < 1e-6)
+
+        # for line in (H[:, 3:] - H_sol[:, 3:]): print(*line)
+        
+        # if not np.allclose(H[:, 3:], H_sol[:, 3:], atol=1e-6 ):
+        #     print("ER NOE FEIL HER!!")
+
+        # H[:, 3:] - H_sol[:, 3:] < 1e-6 * np.ones_like(H[:, 3:]) 
+
+        # assert ( H[:, 3:] - H_sol[:, 3:] < 1e-6 * np.ones_like(H[:, 3:]) 
+            # np.allclose(H[:, 3:], H_sol[:, 3:], atol=1e-6)   # Well it works here...
+        # ), "Something wrong"
+
+        
+        
 
         # TODO: You can set some assertions here to make sure that some of the structure in H is correct
     
@@ -339,7 +355,9 @@ class EKFSLAM:
         # # TODO replace this with your own code
         etaadded_sol, Padded_sol = solution.EKFSLAM.EKFSLAM.add_landmarks(
             self, eta, P, z)
-        return etaadded_sol, Padded_sol
+        # return etaadded_sol, Padded_sol
+
+        np.set_printoptions(suppress=True)
 
         n = P.shape[0]
         assert z.ndim == 1, "SLAM.add_landmarks: z must be a 1d array"
@@ -356,22 +374,20 @@ class EKFSLAM:
         sensor_offset_world = rotmat2d(eta[2]) @ self.sensor_offset
         sensor_offset_world_der = rotmat2d(
             eta[2] + np.pi / 2) @ self.sensor_offset  # Used in Gx
-        print(z.shape)
+        # print(z.shape)
         for j in range(numLmk):
             ind = 2 * j
             inds = slice(ind, ind + 2)
             zj = z[inds]
-            print(zj)
+            # print(zj)
             rot = rotmat2d(zj[1] + eta[2])  # TODO, rotmat in Gz - Assuming that zj is on range-bearing form
             # TODO, calculate position of new landmark in world frame
-            z_x             = zj[0] * np.cos(zj[1]) 
-            z_y             = zj[0] * np.sin(zj[1])
-            print(eta[0] + sensor_offset_world[0])
-            lmnew[inds]     = rotmat2d(eta[2]) @ np.hstack([z_x, z_y]) \
+            z_x             = zj[0] * np.cos(zj[1] + eta[2]) 
+            z_y             = zj[0] * np.sin(zj[1] + eta[2])
+            # print(eta[0] + sensor_offset_world[0])
+            lmnew[inds]     = np.hstack([z_x, z_y]) \
                                 + eta[:2] + sensor_offset_world
                                 
-
-            
 
             Gx[inds, :2]    = I2  # TODO
             Gx[inds, 2]     = zj[0] * np.hstack([-np.sin(zj[1] + eta[2]), \
@@ -407,7 +423,7 @@ class EKFSLAM:
         assert np.all(
             np.linalg.eigvals(Padded) >= 0
         ), "EKFSLAM.add_landmarks: Padded not PSD"
-        print(etaadded - etaadded_sol)
+        # print(etaadded - etaadded_sol)
         print("=========================")
         print(Padded - Padded_sol)
 
@@ -500,20 +516,20 @@ class EKFSLAM:
 
             # Here you can use simply np.kron (a bit slow) to form the big (very big in VP after a while) R,
             # or be smart with indexing and broadcasting (3d indexing into 2d mat) realizing you are adding the same R on all diagonals
-            S = H @ P @ H.T + np.kron(np.eye(numLmk), self.R)  # TODO,
+            S       = H @ P @ H.T + np.kron(np.eye(numLmk), self.R)  # TODO,
             assert (
                 S.shape == zpred.shape * 2
             ), "EKFSLAM.update: wrong shape on either S or zpred"
-            z = z.ravel()  # 2D -> flat
+            z       = z.ravel()  # 2D -> flat
 
             # Perform data association
             za, zpred, Ha, Sa, a = self.associate(z, zpred, H, S)
 
             # No association could be made, so skip update
             if za.shape[0] == 0:
-                etaupd = eta
-                Pupd = P
-                NIS = 1  # TODO: beware this one when analysing consistency.
+                etaupd  = eta
+                Pupd    = P
+                NIS     = 1  # TODO: beware this one when analysing consistency.
             else:
                 # Create the associated innovation
                 v = za.ravel() - zpred  # za: 2D -> flat
@@ -523,7 +539,6 @@ class EKFSLAM:
                 # S_cho_factors = la.cho_factor(Sa) # Optional, used in places for S^-1, see scipy.linalg.cho_factor and scipy.linalg.cho_solve
                 
                 W       = P @ Ha.T @ la.inv(Sa)  # TODO, Kalman gain, can use S_cho_factors
-                print(Sa.shape)
                 etaupd  = eta + W @ v  # TODO, Kalman update
 
                 # Kalman cov update: use Joseph form for stability
