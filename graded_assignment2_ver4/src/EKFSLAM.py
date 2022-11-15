@@ -292,8 +292,8 @@ class EKFSLAM:
             
             zc_i        = zc[:, i].reshape([2,1])
             zc_norm     = zr[i]
-            delta_m_i       = delta_m[:, i].reshape([2,1])
-            delta_m_norm     = la.norm(delta_m_i)
+            delta_m_i   = delta_m[:, i].reshape([2,1])
+            
 
             # TODO: Set H or Hx and Hm here
             jac_z_cb    = np.hstack([-np.eye(2), -Rpihalf @ delta_m_i])
@@ -382,17 +382,11 @@ class EKFSLAM:
             # print(zj)
             rot = rotmat2d(zj[1] + eta[2])  # TODO, rotmat in Gz - Assuming that zj is on range-bearing form
             # TODO, calculate position of new landmark in world frame
-            z_x             = zj[0] * np.cos(zj[1] + eta[2]) 
-            z_y             = zj[0] * np.sin(zj[1] + eta[2])
-            # print(eta[0] + sensor_offset_world[0])
-            lmnew[inds]     = np.hstack([z_x, z_y]) \
-                                + eta[:2] + sensor_offset_world
-                                
 
+            lmnew[inds]     =  zj[0] * rot[:, 0] + eta[:2] + sensor_offset_world
+            
             Gx[inds, :2]    = I2  # TODO
-            Gx[inds, 2]     = zj[0] * np.hstack([-np.sin(zj[1] + eta[2]), \
-                                                 np.cos(zj[1] + eta[2])] + \
-                                                 sensor_offset_world_der)  # TODO
+            Gx[inds, 2]     = zj[0] * rot[:, 1] + sensor_offset_world_der  # TODO
 
             Gz = rot @ np.diag([1, zj[0]])  # TODO
 
@@ -425,7 +419,7 @@ class EKFSLAM:
         ), "EKFSLAM.add_landmarks: Padded not PSD"
         # print(etaadded - etaadded_sol)
         print("=========================")
-        print(Padded - Padded_sol)
+        # for line in (Padded - Padded_sol): print(*line)
 
         return etaadded, Padded
 
