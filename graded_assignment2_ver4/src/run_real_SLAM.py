@@ -85,78 +85,89 @@ def main():
         **loadmat(str(victoria_park_foler.joinpath("aa3_gpsx"))),
     }
 
-    timeOdo = (realSLAM_ws["time"] / 1000).ravel()
-    timeLsr = (realSLAM_ws["TLsr"] / 1000).ravel()
-    timeGps = (realSLAM_ws["timeGps"] / 1000).ravel()
+    timeOdo     = (realSLAM_ws["time"] / 1000).ravel()
+    timeLsr     = (realSLAM_ws["TLsr"] / 1000).ravel()
+    timeGps     = (realSLAM_ws["timeGps"] / 1000).ravel()
 
-    steering = realSLAM_ws["steering"].ravel()
-    speed = realSLAM_ws["speed"].ravel()
-    LASER = (
-        realSLAM_ws["LASER"] / 100
-    )  # Divide by 100 to be compatible with Python implementation of detectTrees
-    La_m = realSLAM_ws["La_m"].ravel()
-    Lo_m = realSLAM_ws["Lo_m"].ravel()
+    steering    = realSLAM_ws["steering"].ravel()
+    speed       = realSLAM_ws["speed"].ravel()
+    LASER       = (
+                    realSLAM_ws["LASER"] / 100
+                )  # Divide by 100 to be compatible with Python implementation of detectTrees
+    La_m        = realSLAM_ws["La_m"].ravel()
+    Lo_m        = realSLAM_ws["Lo_m"].ravel()
 
-    K = timeOdo.size
-    mK = timeLsr.size
-    Kgps = timeGps.size
+    K           = timeOdo.size
+    mK          = timeLsr.size
+    Kgps        = timeGps.size
+
+    # print(La_m.shape)
+    # print(K)
+    # print(mK)
+    # print(Kgps)
+
+    # print((timeGps < timeOdo[5000 - 1]).shape)
+
+    # print(La_m[timeGps < timeOdo[5000 - 1]].shape)
+    # print(La_m.shape)
 
     # %% Parameters
 
-    L = 2.83  # axel distance
-    H = 0.76  # center to wheel encoder
-    a = 0.95  # laser distance in front of first axel
-    b = 0.5  # laser distance to the left of center
-
-    car = Car(L, H, a, b)
-
-    sigmas = 0.025 * np.array([0.0001, 0.00005, 6 * np.pi / 180])  # TODO tune
-    CorrCoeff = np.array([[1, 0, 0], [0, 1, 0.9], [0, 0.9, 1]])
-    Q = np.diag(sigmas) @ CorrCoeff @ np.diag(sigmas)
-    R = np.diag([0.1, 1 * np.pi / 180]) ** 2  # TODO tune
-
-    # first is for joint compatibility, second is individual
-    JCBBalphas = np.array([0.00001, 1e-6])  # TODO tune
+    L               = 2.83  # axel distance
+    H               = 0.76  # center to wheel encoder
+    a               = 0.95  # laser distance in front of first axel
+    b               = 0.5  # laser distance to the left of center
 
     
-        
-    sensorOffset = np.array([car.a + car.L, car.b])
-    doAsso = True
 
-    slam = EKFSLAM(Q, R, do_asso=doAsso, alphas=JCBBalphas,
-                   sensor_offset=sensorOffset)
+    car             = Car(L, H, a, b)
+
+    sigmas          = 0.025 * np.array([0.0001, 0.00005, 6 * np.pi / 180])  # TODO tune
+    CorrCoeff       = np.array([[1, 0, 0], [0, 1, 0.9], [0, 0.9, 1]])
+    Q               = np.diag(sigmas) @ CorrCoeff @ np.diag(sigmas)
+    R               = np.diag([0.1, 1 * np.pi / 180]) ** 2  # TODO tune
+
+    # first is for joint compatibility, second is individual
+    JCBBalphas      = np.array([0.00001, 1e-6])  # TODO tune
+
+    
+    sensorOffset    = np.array([car.a + car.L, car.b])
+    doAsso          = True
+
+    slam            = EKFSLAM(Q, R, do_asso=doAsso, alphas=JCBBalphas,
+                            sensor_offset=sensorOffset)
 
     # For consistency testing
-    alpha = 0.05
+    alpha           = 0.05
     confidence_prob = 1 - alpha
 
-    xupd = np.zeros((mK, 3))
-    a = [None] * mK
-    NIS = np.zeros(mK)
-    NISnorm = np.zeros(mK)
-    CI = np.zeros((mK, 2))
-    CInorm = np.zeros((mK, 2))
+    xupd            = np.zeros((mK, 3))
+    a               = [None] * mK
+    NIS             = np.zeros(mK)
+    NISnorm         = np.zeros(mK)
+    CI              = np.zeros((mK, 2))
+    CInorm          = np.zeros((mK, 2))
 
-    eta = np.array([Lo_m[0], La_m[1], 36 * np.pi / 180])
-    P = np.zeros((3, 3))
+    eta             = np.array([Lo_m[0], La_m[1], 36 * np.pi / 180])
+    P               = np.zeros((3, 3))
 
-    mk_first = 1  # first seems to be a bit off in timing
-    mk = mk_first
-    t = timeOdo[0]
+    mk_first        = 1  # first seems to be a bit off in timing
+    mk              = mk_first
+    t               = timeOdo[0]
 
     # %%  run
-    N = 5000  # K
+    N               = 5000  # K
 
-    doPlot = False
+    doPlot          = False
 
-    lh_pose = None
+    lh_pose         = None
 
     if doPlot:
-        fig, ax = plt.subplots(num=1, clear=True)
+        fig, ax     = plt.subplots(num=1, clear=True)
 
-        lh_pose = ax.plot(eta[0], eta[1], "k", lw=3)[0]
-        sh_lmk = ax.scatter(np.nan, np.nan, c="r", marker="x")
-        sh_Z = ax.scatter(np.nan, np.nan, c="b", marker=".")
+        lh_pose     = ax.plot(eta[0], eta[1], "k", lw=3)[0]
+        sh_lmk      = ax.scatter(np.nan, np.nan, c="r", marker="x")
+        sh_Z        = ax.scatter(np.nan, np.nan, c="b", marker=".")
 
     do_raw_prediction = True
     if do_raw_prediction:  # TODO: further processing such as plotting
@@ -165,8 +176,10 @@ def main():
         odox[0] = eta
         P_odo = P.copy()
         for k in range(min(N, K - 1)):
-            odos[k + 1] = odometry(speed[k + 1], steering[k + 1], 0.025, car)
-            odox[k + 1], _ = slam.predict(odox[k], P_odo, odos[k + 1])
+            odos[k + 1]     = odometry(speed[k + 1], steering[k + 1], 0.025, car)
+            odox[k + 1], _  = slam.predict(odox[k], P_odo, odos[k + 1])
+        
+        
 
     for k in tqdm(range(N)):
         if mk < mK - 1 and timeLsr[mk] <= timeOdo[k + 1]:
@@ -174,24 +187,24 @@ def main():
             # seem like the prediction might be introducing some minor asymetries,
             # so best to force P symetric before update (where chol etc. is used).
             # TODO: remove this for short debug runs in order to see if there are small errors
-            P = (P + P.T) / 2
-            dt = timeLsr[mk] - t
+            P   = (P + P.T) / 2
+            dt  = timeLsr[mk] - t
             if dt < 0:  # avoid assertions as they can be optimized avay?
                 raise ValueError("negative time increment")
 
             # ? reset time to this laser time for next post predict
-            t = timeLsr[mk]
-            odo = odometry(speed[k + 1], steering[k + 1], dt, car)
-            eta, P = slam.predict(eta, P, odo)
+            t           = timeLsr[mk]
+            odo         = odometry(speed[k + 1], steering[k + 1], dt, car)
+            eta, P      = slam.predict(eta, P, odo)
 
-            z = detectTrees(LASER[mk])
+            z           = detectTrees(LASER[mk])
             eta, P, NIS[mk], a[mk] = slam.update(eta, P, z)
 
-            num_asso = np.count_nonzero(a[mk] > -1)
+            num_asso    = np.count_nonzero(a[mk] > -1)
 
             if num_asso > 0:
                 NISnorm[mk] = NIS[mk] / (2 * num_asso)
-                CInorm[mk] = np.array(chi2.interval(confidence_prob, 2 * num_asso)) / (
+                CInorm[mk]  = np.array(chi2.interval(confidence_prob, 2 * num_asso)) / (
                     2 * num_asso
                 )
             else:
@@ -216,9 +229,11 @@ def main():
                 lh_pose.set_data(*xupd[mk_first:mk, :2].T)
 
                 ax.set(
-                    xlim=[-200, 200],
-                    ylim=[-200, 200],
-                    title=f"step {k}, laser scan {mk}, landmarks {len(eta[3:])//2},\nmeasurements {z.shape[0]}, num new = {np.sum(a[mk] == -1)}",
+                    xlim    =[-200, 200],
+                    ylim    =[-200, 200],
+                    title   =f"step {k}, laser scan {mk}, \
+                                landmarks {len(eta[3:])//2},\nmeasurements \
+                                    {z.shape[0]}, num new = {np.sum(a[mk] == -1)}",
                 )
                 plt.draw()
                 plt.pause(0.00001)
@@ -226,23 +241,41 @@ def main():
             mk += 1
 
         if k < K - 1:
-            dt = timeOdo[k + 1] - t
-            t = timeOdo[k + 1]
-            odo = odometry(speed[k + 1], steering[k + 1], dt, car)
-            eta, P = slam.predict(eta, P, odo)
+            dt      = timeOdo[k + 1] - t
+            t       = timeOdo[k + 1]
+            odo     = odometry(speed[k + 1], steering[k + 1], dt, car)
+            eta, P  = slam.predict(eta, P, odo)
+
+    
+
+    # %% Plot of position vs GPS distance
+    fig1, ax1   = plt.subplots(nrows=2, ncols=1,figsize=(7, 5), num=1, clear=True, sharex=True)
+    tags        = ["x", "y"]
+    GPS         = [La_m, Lo_m]
+    inds        = [0, 1]
+    for ax, tag, gps, ind in zip(ax1, tags, GPS, inds):  
+        ax.plot(gps[:Kgps])
+        ax.plot(odox[:Kgps, ind])  
+        ax.legend(f"{tag} vs GPS")
+        ax.set_ylabel("Meters [m]")
+        ax.set_title(f"{tag} (from odox) vs. GPS", size=50, weight='bold')
+
 
     # %% Consistency
 
     # NIS
     insideCI = (CInorm[:mk, 0] <= NISnorm[:mk]) * \
         (NISnorm[:mk] <= CInorm[:mk, 1])
-
+    
     fig3, ax3 = plt.subplots(num=3, clear=True)
     ax3.plot(CInorm[:mk, 0], "--")
     ax3.plot(CInorm[:mk, 1], "--")
     ax3.plot(NISnorm[:mk], lw=0.5)
 
     ax3.set_title(f"NIS, {insideCI.mean()*100:.2f}% inside CI")
+    print("\nNumber of times NIS falls within CI:\t\t", np.count_nonzero(insideCI), "/", N)
+    print("ANIS:\t", NIS.mean()) #Usikker på om vi skal bruke insideCI.mean() istede for NIS.mean(), gjelder samme i sim.
+
 
     # %% slam
 
